@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GME Marketing Invoice Generator</title>
+<style>
+  :root { --border:#222; --muted:#666; --bg:#f3f5f7; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, Helvetica, sans-serif; background:var(--bg); color:#111; }
+  .toolbar { position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:8px; padding:12px; background:#1f2937; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+  button { border:0; border-radius:6px; padding:9px 14px; font-weight:700; cursor:pointer; }
+  .primary { background:#f5c542; color:#111; }
+  .secondary { background:#fff; color:#111; }
+  .danger { background:#dc3545; color:#fff; }
+  .page { width:210mm; min-height:297mm; margin:18px auto; padding:11mm 10mm 9mm; background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.16); display:flex; flex-direction:column; }
+  .company { text-align:center; border-bottom:1.5px solid #111; padding-bottom:7mm; margin-bottom:5mm; }
+  .company h1 { margin:0 0 2mm; font-size:22px; letter-spacing:.2px; }
+  .company h1 span { font-size:11px; font-weight:400; vertical-align:middle; }
+  .company p { margin:1mm 0; font-size:14px; line-height:1.25; }
+  .top-grid { display:grid; grid-template-columns: 58% 42%; gap:1.5mm; }
+  .box { border:1px solid var(--border); padding:4mm; min-height:43mm; }
+  .invoice-box { min-height:31mm; }
+  .meta-box { margin-top:1.5mm; min-height:20mm; }
+  .field-line { display:grid; grid-template-columns:31mm 4mm 1fr; align-items:start; margin:1.5mm 0; font-size:13px; }
+  .customer-area textarea { width:100%; min-height:20mm; border:0; resize:vertical; font:inherit; padding:0; }
+  input, textarea, select { font:inherit; color:#111; }
+  .clean-input { width:100%; border:0; border-bottom:1px dotted #aaa; outline:none; padding:1px 2px; background:transparent; }
+  .invoice-title { font-weight:800; font-size:17px; }
+  .items-wrap { margin-top:5mm; flex:1; }
+  table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  thead th { border-top:1.5px solid #111; border-bottom:1.5px solid #111; padding:3mm 1.5mm; font-size:12px; font-weight:500; text-align:left; }
+  tbody td { padding:3mm 1.5mm; vertical-align:top; font-size:12px; }
+  tbody tr { border-bottom:1px dotted #d0d0d0; }
+  .num { text-align:right; }
+  .center { text-align:center; }
+  td input { width:100%; border:0; outline:none; background:transparent; }
+  .qty-input, .price-input { text-align:right; }
+  .delete-row { padding:2px 7px; border-radius:4px; background:#eee; color:#b00020; font-size:12px; }
+  .total-row { border-top:1.5px solid #111; display:flex; justify-content:flex-end; align-items:center; margin-top:4mm; font-size:14px; font-weight:700; }
+  .total-label { padding:2.5mm; }
+  .total-value { border:1px solid #111; min-width:42mm; text-align:right; padding:2.5mm 3mm; }
+  .footer-grid { display:grid; grid-template-columns: 37% 28% 35%; gap:1.5mm; margin-top:2mm; }
+  .footer-box { border:1px solid #111; min-height:52mm; padding:2.5mm; font-size:10.5px; line-height:1.25; }
+  .footer-box h4 { margin:0 0 2mm; font-size:11px; }
+  .footer-box p { margin:1.2mm 0; }
+  .signature-space { height:30mm; display:flex; align-items:flex-end; }
+  .signature-line { width:85%; border-top:1px solid #111; padding-top:2mm; }
+  .sign-row { display:grid; grid-template-columns:22mm 1fr; margin:2mm 0; align-items:end; }
+  .line { border-bottom:1px solid #111; height:5mm; }
+  .no-print-note { color:#fff; margin-left:auto; align-self:center; font-size:12px; }
+  @page { size:A4; margin:0; }
+  @media print {
+    body { background:#fff; }
+    .toolbar, .delete-col, .delete-row { display:none !important; }
+    .page { width:210mm; min-height:297mm; margin:0; box-shadow:none; }
+    input, textarea { border:none !important; }
+    tbody tr { border-bottom:none; }
+  }
+  @media (max-width: 900px) {
+    .page { transform-origin:top left; width:210mm; margin:8px; }
+    .no-print-note { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button class="primary" onclick="addRow()">+ Add Item</button>
+  <button class="secondary" onclick="saveInvoice()">Save</button>
+  <button class="secondary" onclick="loadInvoice()">Load Saved</button>
+  <button class="secondary" onclick="clearForm()">New Invoice</button>
+  <button class="secondary" onclick="window.print()">Generate / Print PDF</button>
+  <span class="no-print-note">Choose “Save as PDF” in the print window.</span>
+</div>
+
+<main class="page" id="invoicePage">
+  <header class="company">
+    <h1>GME MARKETING <span>(200330T)</span></h1>
+    <p>No. G-G-60, Lorong Inanam Kapital 5, Inanam Kapital,<br>Jalan Nountun, Inanam, 88450 Kota Kinabalu, Sabah</p>
+    <p>☎: 0198719868 &nbsp;&nbsp; ✉: gme.sbkk@gmail.com</p>
+  </header>
+
+  <section class="top-grid">
+    <div class="box customer-area">
+      <input class="clean-input" id="customerCode" placeholder="Customer code (optional)">
+      <input class="clean-input" id="customerName" placeholder="CUSTOMER / COMPANY NAME" style="font-weight:700; margin-top:2mm;">
+      <textarea id="customerAddress" placeholder="Customer address"></textarea>
+      <div class="field-line"><span>Attn</span><span>:</span><input class="clean-input" id="attn"></div>
+      <div class="field-line"><span>Tel</span><span>:</span><input class="clean-input" id="customerTel"></div>
+      <div class="field-line"><span>Cust. Ref.</span><span>:</span><input class="clean-input" id="customerRef"></div>
+    </div>
+
+    <div>
+      <div class="box invoice-box">
+        <div class="field-line invoice-title"><span>INVOICE</span><span>:</span><input class="clean-input" id="invoiceNo" value="IV-00001"></div>
+        <div class="field-line"><span>Our D/O No</span><span>:</span><input class="clean-input" id="doNo"></div>
+        <div class="field-line"><span>Date</span><span>:</span><input class="clean-input" type="date" id="invoiceDate"></div>
+        <div class="field-line"><span>Terms</span><span>:</span><input class="clean-input" id="terms" value="30 Days"></div>
+      </div>
+      <div class="box meta-box">
+        <div class="field-line"><span>Agent</span><span>:</span><input class="clean-input" id="agent"></div>
+        <div class="field-line"><span>Admin</span><span>:</span><input class="clean-input" id="admin" value="ADMIN"></div>
+        <div class="field-line"><span>Page</span><span>:</span><span>1 of 1</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="items-wrap">
+    <table id="itemsTable">
+      <colgroup>
+        <col style="width:6%"><col style="width:17%"><col style="width:39%"><col style="width:10%"><col style="width:13%"><col style="width:13%"><col class="delete-col" style="width:2%">
+      </colgroup>
+      <thead>
+        <tr><th class="center">No</th><th>Item Code</th><th>Description</th><th class="num">Qty</th><th class="num">Price/Unit</th><th class="num">Amount</th><th class="delete-col"></th></tr>
+      </thead>
+      <tbody id="itemsBody"></tbody>
+    </table>
+  </section>
+
+  <div class="total-row">
+    <div class="total-label">Total (MYR)</div>
+    <div class="total-value" id="grandTotal">0.00</div>
+  </div>
+
+  <section class="footer-grid">
+    <div class="footer-box">
+      <h4>Notes :</h4>
+      <p><b>1.</b> This invoice also serves as a Delivery Order</p>
+      <p><b>2.</b> Invoice not paid within due will carry a service charge of 1.5% per month.</p>
+      <p><b>3.</b> Payment by cheque must be made "A/C Payee Only" and to:</p>
+      <p style="padding-left:5mm;"><b>Payee :</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GME MARKETING<br><b>Bank Account :</b> &nbsp; MAYBANK 560102721243</p>
+      <p><b>4.</b> Warranty Item (Battery):<br>&nbsp;&nbsp;&nbsp;&nbsp;- Petrol Vehicle: 12 months<br>&nbsp;&nbsp;&nbsp;&nbsp;- Diesel Vehicle: 06 months<br>&nbsp;&nbsp;&nbsp;&nbsp;- Commercial / Grab Vehicle: 06 months</p>
+      <p><b>5.</b> 3 DAYS for processing warranty claim.</p>
+    </div>
+
+    <div class="footer-box">
+      <h4>Received in Good Order And Condition</h4>
+      <div class="signature-space"><div class="signature-line">Customer(s) Chop &amp; Sign</div></div>
+    </div>
+
+    <div class="footer-box">
+      <h4>For GME Marketing</h4>
+      <div class="sign-row"><span>Storekeeper :</span><span class="line"></span></div>
+      <div class="sign-row"><span>Checked By :</span><span class="line"></span></div>
+      <div class="sign-row"><span>Issue By :</span><span class="line"></span></div>
+      <div style="height:10mm"></div>
+      <div class="sign-row"><span>Transport Co. :</span><span class="line"></span></div>
+      <div class="sign-row"><span>Lorry No. :</span><span class="line"></span></div>
+      <div class="sign-row"><span>Name :</span><span class="line"></span></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const fieldIds = ['customerCode','customerName','customerAddress','attn','customerTel','customerRef','invoiceNo','doNo','invoiceDate','terms','agent','admin'];
+
+function todayISO(){
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60000).toISOString().slice(0,10);
+}
+
+function money(value){
+  const n = Number(value) || 0;
+  return n.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function addRow(data={}){
+  const body = document.getElementById('itemsBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="center row-no"></td>
+    <td><input class="item-code" value="${escapeHtml(data.code || '')}" placeholder="Code"></td>
+    <td><input class="description" value="${escapeHtml(data.description || '')}" placeholder="Item description"></td>
+    <td><input class="qty-input" type="number" min="0" step="0.01" value="${data.qty ?? 1}"></td>
+    <td><input class="price-input" type="number" min="0" step="0.01" value="${data.price ?? ''}" placeholder="0.00"></td>
+    <td class="num amount">0.00</td>
+    <td class="delete-col"><button type="button" class="delete-row" title="Delete row">×</button></td>`;
+  tr.querySelector('.qty-input').addEventListener('input', calculateTotals);
+  tr.querySelector('.price-input').addEventListener('input', calculateTotals);
+  tr.querySelector('.delete-row').addEventListener('click', ()=>{ tr.remove(); renumber(); calculateTotals(); });
+  body.appendChild(tr);
+  renumber();
+  calculateTotals();
+}
+
+function renumber(){
+  document.querySelectorAll('#itemsBody tr').forEach((tr,i)=>tr.querySelector('.row-no').textContent=i+1);
+}
+
+function calculateTotals(){
+  let total = 0;
+  document.querySelectorAll('#itemsBody tr').forEach(tr=>{
+    const qty = Number(tr.querySelector('.qty-input').value) || 0;
+    const price = Number(tr.querySelector('.price-input').value) || 0;
+    const amount = qty * price;
+    tr.querySelector('.amount').textContent = money(amount);
+    total += amount;
+  });
+  document.getElementById('grandTotal').textContent = money(total);
+}
+
+function getInvoiceData(){
+  const fields = {};
+  fieldIds.forEach(id=>fields[id]=document.getElementById(id).value);
+  const items = [...document.querySelectorAll('#itemsBody tr')].map(tr=>({
+    code:tr.querySelector('.item-code').value,
+    description:tr.querySelector('.description').value,
+    qty:tr.querySelector('.qty-input').value,
+    price:tr.querySelector('.price-input').value
+  }));
+  return {fields,items};
+}
+
+function saveInvoice(){
+  localStorage.setItem('gmeInvoiceDraft',JSON.stringify(getInvoiceData()));
+  alert('Invoice saved in this browser.');
+}
+
+function loadInvoice(){
+  const raw = localStorage.getItem('gmeInvoiceDraft');
+  if(!raw){ alert('No saved invoice found.'); return; }
+  const data = JSON.parse(raw);
+  fieldIds.forEach(id=>document.getElementById(id).value=data.fields?.[id] || '');
+  document.getElementById('itemsBody').innerHTML='';
+  (data.items?.length ? data.items : [{}]).forEach(addRow);
+  calculateTotals();
+}
+
+function clearForm(){
+  if(!confirm('Clear all invoice details and start a new invoice?')) return;
+  fieldIds.forEach(id=>document.getElementById(id).value='');
+  document.getElementById('invoiceDate').value=todayISO();
+  document.getElementById('invoiceNo').value='IV-00001';
+  document.getElementById('terms').value='30 Days';
+  document.getElementById('admin').value='ADMIN';
+  document.getElementById('itemsBody').innerHTML='';
+  addRow();
+}
+
+function escapeHtml(text){
+  return String(text).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+
+document.getElementById('invoiceDate').value=todayISO();
+addRow();
+</script>
+</body>
+</html>
